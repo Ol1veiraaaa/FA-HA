@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luxury Christmas - Final Optimized</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000000; font-family: 'Cinzel', serif; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10; pointer-events: none;
+            display: flex; flex-direction: column; 
+            align-items: center;
+        }
+
+        #gesture-guide {
+            position: absolute; top: 30px; left: 30px; width: 240px;
+            padding: 20px; background: rgba(10, 10, 10, 0.6);
+            border: 1px solid rgba(212, 175, 55, 0.3); border-left: 3px solid #d4af37;
+            backdrop-filter: blur(5px); color: #d4af37;
+            pointer-events: auto; transition: opacity 0.5s;
+        }
+        .guide-title { font-size: 16px; border-bottom: 1px solid rgba(212, 175, 55, 0.2); padding-bottom: 8px; margin-bottom: 12px; font-weight: 700; letter-spacing: 2px; }
+        .guide-item { display: flex; align-items: center; margin-bottom: 12px; font-size: 14px; letter-spacing: 1px; }
+        .guide-icon { font-size: 18px; margin-right: 12px; width: 25px; text-align: center; }
+
+        #memory-gallery {
+            position: absolute; top: 30px; right: 30px; width: 80px; max-height: 80vh;
+            display: flex; flex-direction: column; gap: 10px; pointer-events: auto; 
+            overflow-y: auto; padding-right: 5px;
+        }
+        .gallery-item { position: relative; width: 70px; height: 70px; border: 1px solid rgba(212, 175, 55, 0.4); background: rgba(0,0,0,0.5); transition: transform 0.2s; flex-shrink: 0; }
+        .gallery-thumb { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; }
+        .delete-btn { position: absolute; top: -5px; right: -5px; width: 20px; height: 20px; background: #990000; color: white; border: none; border-radius: 50%; font-size: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s; }
+        .gallery-item:hover .delete-btn { opacity: 1; }
+
+        #webcam-container {
+            position: absolute; bottom: 20px; left: 20px;
+            width: 160px; height: 120px;
+            border: 2px solid #D4AF37; background-color: #000;
+            z-index: 999; box-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
+            border-radius: 8px; overflow: hidden;
+            display: flex; justify-content: center; align-items: center;
+        }
+        #webcam-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        #webcam-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transform: scaleX(-1); }
+
+        .title-container { margin-top: 40px; text-align: center; transition: opacity 0.5s; }
+        h1 { color: #fceea7; font-size: 56px; margin: 0; font-weight: 400; letter-spacing: 6px; text-shadow: 0 0 50px rgba(252, 238, 167, 0.6); background: linear-gradient(to bottom, #fff, #eebb66); -webkit-background-clip: text; -webkit-text-fill-color: transparent; opacity: 0.9; }
+        .upload-wrapper { margin-top: 20px; pointer-events: auto; text-align: center; }
+        .upload-btn { background: rgba(20, 20, 20, 0.6); border: 1px solid rgba(212, 175, 55, 0.4); color: #d4af37; padding: 10px 25px; cursor: pointer; text-transform: uppercase; letter-spacing: 3px; font-size: 10px; transition: all 0.4s; display: inline-block; backdrop-filter: blur(5px); }
+        .upload-btn:hover { background: #d4af37; color: #000; box-shadow: 0 0 20px rgba(212, 175, 55, 0.5); }
+        .hint-text { color: rgba(212, 175, 55, 0.5); font-size: 9px; margin-top: 8px; letter-spacing: 1px; text-transform: uppercase; }
+        #file-input { display: none; }
+        .ui-hidden { opacity: 0; pointer-events: none !important; }
+
+        #status-indicator {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.6); border: 1px solid #d4af37;
+            padding: 5px 15px; color: #d4af37; font-size: 12px; letter-spacing: 2px;
+            border-radius: 15px; z-index: 100; text-transform: uppercase;
+        }
+
+        #loader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.8s ease-out; }
+        .loader-text { color: #d4af37; font-size: 14px; letter-spacing: 4px; margin-top: 20px; text-transform: uppercase; }
+        .spinner { width: 40px; height: 40px; border: 1px solid rgba(212, 175, 55, 0.2); border-top: 1px solid #d4af37; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "gsap": "https://unpkg.com/gsap@3.12.5/index.js",
+                "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/+esm"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <div class="loader-text">Loading System...</div>
+    </div>
+
+    <div id="status-indicator">Initializing AI...</div>
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <div id="gesture-guide">
+            <div class="guide-title">Gesture Control</div>
+            <div class="guide-item"><span class="guide-icon">✊</span><span>Fist: Form Tree (聚合)</span></div>
+            <div class="guide-item"><span class="guide-icon">🖐</span><span>Palm: Scatter (散开)</span></div>
+            <div class="guide-item"><span class="guide-icon">👌</span><span>Pinch: Grab Nearest (抓取最近)</span></div>
+            <div class="guide-item"><span class="guide-icon">↔️</span><span>Move: Rotate (左右移动)</span></div>
+        </div>
+        <div id="memory-gallery"></div>
+        <div class="title-container">
+            <h1>Merry Christmas</h1>
+            <div class="upload-wrapper">
+                <label class="upload-btn">Add More<input type="file" id="file-input" multiple accept="image/*"></label>
+                <div class="hint-text">Press 'H' to Hide Controls</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="webcam-container">
+        <video id="webcam-video" autoplay playsinline muted></video>
+        <canvas id="webcam-canvas"></canvas>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'; 
+        import gsap from 'gsap';
+        import { GestureRecognizer, FilesetResolver, DrawingUtils } from "@mediapipe/tasks-vision";
+
+        // --- 设置：预设照片数量 ---
+        // 系统会自动寻找 photos/1.jpg 到 photos/20.jpg
+        // 如果文件不存在，会在控制台报错但不会崩坏
+        const MAX_PRESET_PHOTOS = 20;
+
+        const CONFIG = {
+            colors: { bg: 0x000000, champagneGold: 0xffd966, deepGreen: 0x03180a, accentRed: 0x990000 },
+            particles: { count: 1200, treeHeight: 25, treeRadius: 9 },
+            camera: { z: 45 }
+        };
+
+        const STATE = { 
+            mode: 'TREE', 
+            hand: { detected: false, gesture: 'None', rotationSpeed: 0 },
+            lastGestureTime: 0
+        };
+        
+        let scene, camera, renderer, composer, mainGroup;
+        let particles = [], photoMeshes = [];
+        let caneTexture;
+        let photoIdCounter = 0;
+        let gestureRecognizer;
+        let lastVideoTime = -1;
+
+        const updateStatus = (text) => document.getElementById('status-indicator').innerText = text;
+        const hideLoader = () => {
+            const loader = document.getElementById('loader');
+            if(loader) { loader.style.opacity = 0; setTimeout(()=>loader.remove(), 800); }
+        };
+
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene(); scene.background = new THREE.Color(CONFIG.colors.bg);
+            scene.fog = new THREE.FogExp2(CONFIG.colors.bg, 0.015);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, CONFIG.camera.z);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ReinhardToneMapping;
+            renderer.toneMappingExposure = 1.0; 
+            container.appendChild(renderer.domElement);
+
+            mainGroup = new THREE.Group(); scene.add(mainGroup);
+
+            const pmrem = new THREE.PMREMGenerator(renderer);
+            scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+            
+            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            const p1 = new THREE.PointLight(0xffaa00, 2, 20); p1.position.set(0,5,0); mainGroup.add(p1);
+            const spot = new THREE.SpotLight(0xffcc66, 1000); spot.position.set(30,40,40); scene.add(spot);
+            
+            const renderScene = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+            bloomPass.threshold = 0.2; bloomPass.strength = 1.2; bloomPass.radius = 0.5;
+            composer = new EffectComposer(renderer); composer.addPass(renderScene); composer.addPass(bloomPass);
+
+            createTextures();
+            createParticles();
+            
+            // 自动加载预设图片
+            loadPresetPhotos();
+
+            animate();
+        }
+
+        // --- 新增：加载预设照片 ---
+        function loadPresetPhotos() {
+            const loader = new THREE.TextureLoader();
+            for (let i = 1; i <= MAX_PRESET_PHOTOS; i++) {
+                const path = `./photos/${i}.jpg`; // 假设图片格式为jpg
+                loader.load(
+                    path,
+                    (texture) => {
+                        texture.colorSpace = THREE.SRGBColorSpace;
+                        addPhoto(texture, path); // 传入路径作为来源
+                    },
+                    undefined,
+                    (err) => {
+                        // 如果图片不存在（比如只有5张），忽略错误
+                    }
+                );
+            }
+        }
+
+        function createTextures() {
+            const c = document.createElement('canvas'); c.width=128; c.height=128;
+            const ctx = c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,128,128);
+            ctx.fillStyle='#a00'; ctx.beginPath();
+            for(let i=-128; i<256; i+=32) { ctx.moveTo(i,0); ctx.lineTo(i+32,128); ctx.lineTo(i+16,128); ctx.lineTo(i-16,0); }
+            ctx.fill();
+            caneTexture = new THREE.CanvasTexture(c);
+            caneTexture.wrapS = caneTexture.wrapT = THREE.RepeatWrapping; caneTexture.repeat.set(3,3);
+        }
+
+        function createParticles() {
+            const geoSphere = new THREE.SphereGeometry(0.4, 16, 16);
+            const geoBox = new THREE.BoxGeometry(0.45, 0.45, 0.45);
+            const geoCane = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(0,-0.5,0), new THREE.Vector3(0,0.3,0), new THREE.Vector3(0.1,0.5,0), new THREE.Vector3(0.3,0.4,0)]), 16, 0.08, 8, false);
+
+            const matGold = new THREE.MeshStandardMaterial({ color: CONFIG.colors.champagneGold, metalness: 1, roughness: 0.1 });
+            const matGreen = new THREE.MeshStandardMaterial({ color: CONFIG.colors.deepGreen, metalness: 0.2, roughness: 0.8 });
+            const matRed = new THREE.MeshPhysicalMaterial({ color: CONFIG.colors.accentRed, metalness: 0.3, roughness: 0.2, clearcoat: 1 });
+            const matCane = new THREE.MeshStandardMaterial({ map: caneTexture, roughness: 0.4 });
+
+            const star = new THREE.Mesh(new THREE.OctahedronGeometry(1.2,0), new THREE.MeshStandardMaterial({color:0xffdd88, emissive:0xffaa00, metalness:1}));
+            star.position.set(0, CONFIG.particles.treeHeight/2 + 1, 0); mainGroup.add(star);
+            gsap.to(star.rotation, {y:Math.PI*2, duration:4, repeat:-1, ease:"none"});
+
+            for(let i=0; i<CONFIG.particles.count; i++) {
+                let mesh;
+                const r = Math.random();
+                if(r<0.4) mesh = new THREE.Mesh(geoBox, matGreen);
+                else if(r<0.7) mesh = new THREE.Mesh(geoBox, matGold);
+                else if(r<0.9) mesh = new THREE.Mesh(geoSphere, matGold);
+                else if(r<0.96) mesh = new THREE.Mesh(geoSphere, matRed);
+                else mesh = new THREE.Mesh(geoCane, matCane);
+
+                mesh.scale.setScalar(Math.random()*0.5 + 0.4);
+                
+                const hRatio = i/CONFIG.particles.count;
+                const angle = i * 0.5;
+                const yTree = (1-hRatio)*CONFIG.particles.treeHeight - CONFIG.particles.treeHeight/2;
+                const rTree = hRatio * CONFIG.particles.treeRadius;
+                
+                const xTree = rTree * Math.cos(angle*6);
+                const zTree = rTree * Math.sin(angle*6);
+
+                const rScatter = 15 + Math.random()*25;
+                const theta = Math.random()*Math.PI*2;
+                const phi = Math.acos(2*Math.random()-1);
+                const xScatter = rScatter*Math.sin(phi)*Math.cos(theta);
+                const yScatter = rScatter*Math.sin(phi)*Math.sin(theta);
+                const zScatter = rScatter*Math.cos(phi);
+
+                mesh.position.set(xTree, yTree, zTree);
+                mesh.userData = {
+                    posTree: new THREE.Vector3(xTree, yTree, zTree),
+                    posScatter: new THREE.Vector3(xScatter, yScatter, zScatter),
+                    originalScale: mesh.scale.clone(),
+                    rotRandom: {x:Math.random(), y:Math.random(), z:Math.random()}
+                };
+                mainGroup.add(mesh);
+                particles.push(mesh);
+            }
+        }
+
+        function switchState(newState) {
+            if (STATE.mode === newState) return;
+            const now = Date.now();
+            if (now - STATE.lastGestureTime < 800) return;
+            STATE.lastGestureTime = now;
+
+            STATE.mode = newState;
+            updateStatus(`STATE: ${newState}`);
+
+            if (newState === 'TREE') {
+                particles.forEach(p => {
+                    gsap.to(p.position, { x: p.userData.posTree.x, y: p.userData.posTree.y, z: p.userData.posTree.z, duration: 1.5, ease: "power2.inOut" });
+                    gsap.to(p.rotation, { x: 0, y: 0, z: 0, duration: 1.5 });
+                    gsap.to(p.scale, { x: p.userData.originalScale.x, y: p.userData.originalScale.y, z: p.userData.originalScale.z, duration: 1 });
+                });
+                photoMeshes.forEach(p => { gsap.to(p.scale, {x:0, y:0, z:0, duration: 1}); });
+                gsap.to(camera.position, {x:0, y:0, z:CONFIG.camera.z, duration: 1.5});
+                gsap.to(mainGroup.rotation, {x:0, duration: 1.5});
+
+            } else if (newState === 'SCATTER') {
+                particles.forEach(p => {
+                    gsap.to(p.position, { x: p.userData.posScatter.x, y: p.userData.posScatter.y, z: p.userData.posScatter.z, duration: 2, ease: "power2.out" });
+                    gsap.to(p.rotation, { x: p.userData.rotRandom.x*6, y: p.userData.rotRandom.y*6, duration: 2 });
+                });
+                photoMeshes.forEach(p => {
+                     gsap.to(p.position, {x: p.userData.posScatter.x, y:p.userData.posScatter.y, z:p.userData.posScatter.z, duration:2});
+                     gsap.to(p.scale, {x:0.8, y:0.8, z:0.8, duration:1});
+                     gsap.to(p.rotation, {x: p.userData.rotRandom.x*3, y: p.userData.rotRandom.y*3, duration:2});
+                });
+                gsap.to(camera.position, {z: CONFIG.camera.z, duration: 1.5});
+            }
+        }
+
+        function interactWithPhoto() {
+            if (photoMeshes.length === 0) return;
+            if (STATE.mode !== 'FOCUS') {
+                const now = Date.now();
+                if (now - STATE.lastGestureTime < 1000) return;
+                STATE.lastGestureTime = now;
+
+                if (STATE.mode === 'TREE') switchState('SCATTER');
+                STATE.mode = 'FOCUS';
+                updateStatus("STATE: FOCUSING NEAREST");
+
+                let nearestMesh = null;
+                let minDistance = Infinity;
+                const tempVec = new THREE.Vector3();
+
+                photoMeshes.forEach(group => {
+                    group.getWorldPosition(tempVec);
+                    const dist = tempVec.distanceTo(camera.position);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        nearestMesh = group;
+                    }
+                });
+
+                if (!nearestMesh) return;
+                STATE.hand.rotationSpeed = 0;
+
+                const targetWorldPos = new THREE.Vector3(0, 0, CONFIG.camera.z - 8);
+                const targetLocalPos = mainGroup.worldToLocal(targetWorldPos.clone());
+
+                gsap.to(nearestMesh.position, { x: targetLocalPos.x, y: targetLocalPos.y, z: targetLocalPos.z, duration: 1.5, ease: "power2.out" });
+                
+                const targetQuaternion = new THREE.Quaternion();
+                targetQuaternion.copy(camera.quaternion);
+                const parentInverse = mainGroup.quaternion.clone().invert();
+                targetQuaternion.premultiply(parentInverse);
+
+                gsap.to(nearestMesh.quaternion, { x: targetQuaternion.x, y: targetQuaternion.y, z: targetQuaternion.z, w: targetQuaternion.w, duration: 1.5 });
+                gsap.to(nearestMesh.scale, { x: 2.0, y: 2.0, z: 2.0, duration: 1.5 });
+            }
+        }
+
+        // --- 修改后的 addPhoto，支持传入文件或路径 ---
+        function addPhoto(texture, source) {
+            const frameMat = new THREE.MeshStandardMaterial({
+                color: 0xaa8833, metalness: 0.5, roughness: 0.6
+            });
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(1.4,1.4,0.05), frameMat);
+            
+            const photoMat = new THREE.MeshBasicMaterial({
+                map: texture, side: THREE.DoubleSide, color: 0xaaaaaa
+            });
+            const photo = new THREE.Mesh(new THREE.PlaneGeometry(1.2,1.2), photoMat);
+            photo.position.z = 0.04;
+            const group = new THREE.Group(); group.add(frame); group.add(photo);
+            
+            const r = 20 + Math.random()*15;
+            const theta = Math.random()*Math.PI*2;
+            const phi = Math.acos(2*Math.random()-1);
+            group.userData = {
+                posScatter: new THREE.Vector3(r*Math.sin(phi)*Math.cos(theta), r*Math.sin(phi)*Math.sin(theta), r*Math.cos(phi)),
+                rotRandom: {x:Math.random(), y:Math.random()},
+                id: ++photoIdCounter
+            };
+            
+            group.scale.set(0,0,0);
+            mainGroup.add(group);
+            photoMeshes.push(group);
+            
+            const div = document.createElement('div'); div.className='gallery-item'; div.id=`photo-${group.userData.id}`;
+            
+            // 判断 source 是 File 对象还是字符串路径
+            let imgSrc = '';
+            if (source instanceof File) {
+                imgSrc = URL.createObjectURL(source);
+            } else {
+                imgSrc = source;
+            }
+
+            div.innerHTML = `<img src="${imgSrc}" class="gallery-thumb"><button class="delete-btn">×</button>`;
+            div.querySelector('button').onclick = () => removePhoto(group.userData.id);
+            document.getElementById('memory-gallery').appendChild(div);
+
+            if(STATE.mode !== 'TREE') {
+                 gsap.to(group.scale, {x:0.8, y:0.8, z:0.8, duration:1});
+                 gsap.to(group.position, {x:group.userData.posScatter.x, y:group.userData.posScatter.y, z:group.userData.posScatter.z, duration:1});
+            }
+        }
+
+        function removePhoto(id) {
+            const idx = photoMeshes.findIndex(p => p.userData.id === id);
+            if(idx > -1) {
+                const p = photoMeshes[idx];
+                mainGroup.remove(p);
+                photoMeshes.splice(idx, 1);
+                document.getElementById(`photo-${id}`).remove();
+                if(STATE.mode === 'FOCUS') switchState('SCATTER');
+            }
+        }
+
+        document.getElementById('file-input').addEventListener('change', (e) => {
+            if(e.target.files.length) {
+                Array.from(e.target.files).forEach(f => {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => new THREE.TextureLoader().load(ev.target.result, t => { t.colorSpace=THREE.SRGBColorSpace; addPhoto(t, f); });
+                    reader.readAsDataURL(f);
+                });
+            }
+            e.target.value = '';
+        });
+
+        async function startMediaPipe() {
+            updateStatus("Downloading Model...");
+            try {
+                const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+                gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",
+                        delegate: "GPU"
+                    },
+                    runningMode: "VIDEO",
+                    numHands: 1
+                });
+                
+                const video = document.getElementById('webcam-video');
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    updateStatus("Requesting Camera...");
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    video.srcObject = stream;
+                    video.addEventListener("loadeddata", predictWebcam);
+                    hideLoader();
+                    updateStatus("AI Ready: Show Hand");
+                }
+            } catch (err) {
+                console.error(err);
+                updateStatus("AI Init Failed");
+            }
+        }
+
+        async function predictWebcam() {
+            const video = document.getElementById('webcam-video');
+            const canvas = document.getElementById('webcam-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            if(canvas.width !== video.videoWidth) {
+                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            }
+
+            let startTimeMs = performance.now();
+            if (lastVideoTime !== video.currentTime) {
+                lastVideoTime = video.currentTime;
+                
+                if (gestureRecognizer) {
+                    const results = gestureRecognizer.recognizeForVideo(video, startTimeMs);
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    
+                    if (results.gestures.length > 0) {
+                        const gestureName = results.gestures[0][0].categoryName;
+                        const score = results.gestures[0][0].score;
+                        const landmarks = results.landmarks[0]; 
+
+                        const drawingUtils = new DrawingUtils(ctx);
+                        drawingUtils.drawConnectors(landmarks, GestureRecognizer.HAND_CONNECTIONS, {color: "#FFD700", lineWidth: 2});
+
+                        STATE.hand.detected = true;
+
+                        if (score > 0.5) {
+                            if (gestureName === "Closed_Fist") {
+                                switchState("TREE");
+                            } else if (gestureName === "Open_Palm") {
+                                switchState("SCATTER");
+                            }
+                        }
+
+                        if (gestureName !== "Closed_Fist") {
+                            const thumbTip = landmarks[4];
+                            const indexTip = landmarks[8];
+                            const wrist = landmarks[0];
+                            const middleFingerMCP = landmarks[9]; 
+
+                            const pinchDistance = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+                            const handSize = Math.hypot(wrist.x - middleFingerMCP.x, wrist.y - middleFingerMCP.y);
+
+                            if (handSize > 0 && (pinchDistance / handSize) < 0.2) {
+                                ctx.beginPath();
+                                ctx.arc(indexTip.x * canvas.width, indexTip.y * canvas.height, 10, 0, 2 * Math.PI);
+                                ctx.fillStyle = "#00FF00";
+                                ctx.fill();
+                                interactWithPhoto();
+                            }
+                        }
+
+                        const wrist = landmarks[0];
+                        const speed = (0.5 - wrist.x) * 0.05; 
+                        
+                        if (Math.abs(speed) > 0.002) {
+                            STATE.hand.rotationSpeed = speed;
+                        } else {
+                            STATE.hand.rotationSpeed = 0;
+                        }
+                    } else {
+                        STATE.hand.detected = false;
+                        STATE.hand.rotationSpeed = 0;
+                    }
+                }
+            }
+            requestAnimationFrame(predictWebcam);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (STATE.mode === 'FOCUS') {
+                mainGroup.rotation.y += 0;
+            } else if (STATE.mode === 'TREE') {
+                mainGroup.rotation.y += 0.002;
+            } else if (STATE.mode === 'SCATTER') {
+                if (STATE.hand.detected) {
+                    mainGroup.rotation.y += STATE.hand.rotationSpeed * 2; 
+                } else {
+                    mainGroup.rotation.y += 0.0005; 
+                }
+            }
+            const time = Date.now() * 0.001;
+            particles.forEach((p, i) => {
+                if (STATE.mode !== 'TREE') {
+                    p.position.y += Math.sin(time + i) * 0.005;
+                }
+            });
+            composer.render();
+        }
+
+        initThree();
+        setupEvents();
+        startMediaPipe();
+
+        function setupEvents() {
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight); composer.setSize(window.innerWidth, window.innerHeight);
+            });
+            window.addEventListener('keydown', (e) => {
+                if (e.key.toLowerCase() === 'h') {
+                    ['.title-container', '#gesture-guide', '#memory-gallery', '#status-indicator'].forEach(s => document.querySelector(s)?.classList.toggle('ui-hidden'));
+                }
+            });
+        }
+    </script>
+</body>
+</html>
